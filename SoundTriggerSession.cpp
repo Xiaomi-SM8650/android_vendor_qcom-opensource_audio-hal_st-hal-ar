@@ -56,19 +56,18 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
-#define LOG_TAG "sthal_SoundTriggerSession"
+#define LOG_TAG "STHAL: SoundTriggerSession"
 #define ATRACE_TAG (ATRACE_TAG_AUDIO | ATRACE_TAG_HAL)
 #define LOG_NDEBUG 0
-/*#define VERY_VERY_VERBOSE_LOGGING*/
-#ifdef VERY_VERY_VERBOSE_LOGGING
-#define ALOGVV ALOGV
-#else
-#define ALOGVV(a...) do { } while(0)
-#endif
 
 #include "SoundTriggerSession.h"
+#include "SoundTriggerCommon.h"
 
 #include <log/log.h>
 #include <utils/Trace.h>
@@ -124,12 +123,12 @@ int SoundTriggerSession::pal_callback(
 
     if (!stream_handle || !event_data) {
         status = -EINVAL;
-        ALOGE("%s: error, invalid stream handle or event data", __func__);
+        STHAL_ERR(LOG_TAG, "error, invalid stream handle or event data");
         goto exit;
     }
 
-    ALOGD("%s: stream_handle (%p), event_id (%x), event_size (%d),"
-        "cookie (%" PRIu64 ")", __func__, stream_handle, event_id,
+    STHAL_DBG(LOG_TAG, "stream_handle (%p), event_id (%x), event_size (%d),"
+        "cookie (%" PRIu64 ")", stream_handle, event_id,
         event_size, cookie);
 
     session = (SoundTriggerSession *)cookie;
@@ -144,7 +143,7 @@ int SoundTriggerSession::pal_callback(
     } while(!lock_status && session->IsState(ACTIVE));
 
     if (!session->IsState(ACTIVE)) {
-        ALOGW("%s: skip notification as client has stopped", __func__);
+        STHAL_WARN(LOG_TAG, "skip notification as client has stopped");
         goto exit;
     }
 
@@ -157,7 +156,7 @@ int SoundTriggerSession::pal_callback(
         st_event = (struct sound_trigger_recognition_event *)calloc(1, size);
         if (!st_event) {
             status = -ENOMEM;
-            ALOGE("%s: error, failed to allocate recognition event", __func__);
+            STHAL_ERR(LOG_TAG, "error, failed to allocate recognition event");
             goto exit;
         }
 
@@ -169,7 +168,7 @@ int SoundTriggerSession::pal_callback(
             (struct sound_trigger_phrase_recognition_event *)calloc(1, size);
         if (!phrase_event) {
             status = -ENOMEM;
-            ALOGE("%s: error, failed to allocate recognition event", __func__);
+            STHAL_ERR(LOG_TAG, "error, failed to allocate recognition event");
             goto exit;
         }
 
@@ -198,7 +197,7 @@ int SoundTriggerSession::pal_callback(
             }
         }
     } else {
-        ALOGE("%s: Invalid event type :%d", __func__, event->type);
+        STHAL_WARN(LOG_TAG, "Invalid event type :%d", event->type);
         status = -EINVAL;
         goto exit;
     }
@@ -243,7 +242,7 @@ exit:
         free(st_event);
     if (lock_status)
         session->ses_mutex_.unlock();
-    ALOGV("%s: Exit, status %d", __func__, status);
+    STHAL_VERBOSE(LOG_TAG, "Exit, status %d", status);
 
     return status;
 }
@@ -268,7 +267,7 @@ int SoundTriggerSession::OpenPALStream(pal_stream_type_t stream_type)
     struct pal_stream_attributes stream_attributes;
     struct pal_device device;
 
-    ALOGV("%s: Enter", __func__);
+    STHAL_VERBOSE(LOG_TAG, "Enter");
 
     device.id = PAL_DEVICE_IN_HANDSET_VA_MIC; // To-Do: convert into PAL Device
     device.config.sample_rate = 48000;
@@ -287,7 +286,7 @@ int SoundTriggerSession::OpenPALStream(pal_stream_type_t stream_type)
     stream_attributes.in_media_config.ch_info.channels = 1;
     stream_attributes.in_media_config.ch_info.ch_map[0] = PAL_CHMAP_CHANNEL_FL;
 
-    ALOGD("%s:(%x:status)%d", __func__, status, __LINE__);
+    STHAL_DBG(LOG_TAG, "(%x:status)%d", status, __LINE__);
     status = pal_stream_open(&stream_attributes,
                              1,
                              &device,
@@ -297,16 +296,16 @@ int SoundTriggerSession::OpenPALStream(pal_stream_type_t stream_type)
                              (uint64_t)this,
                              &pal_handle_);
 
-    ALOGD("%s:(%x:status)%d", __func__, status, __LINE__);
+    STHAL_DBG(LOG_TAG, "(%x:status)%d", status, __LINE__);
 
     if (status) {
-        ALOGE("%s: Pal Stream Open Error (%x)", __func__, status);
+        STHAL_ERR(LOG_TAG, "Pal Stream Open Error (%x)", status);
         status = -EINVAL;
         goto exit;
     }
 
 exit:
-    ALOGV("%s: Exit, status = %d", __func__, status);
+    STHAL_VERBOSE(LOG_TAG, "Exit, status = %d", status);
 
     return status;
 }
@@ -315,7 +314,7 @@ int SoundTriggerSession::StopRecognition_l()
 {
     int status = 0;
 
-    ALOGV("%s: Enter", __func__);
+    STHAL_VERBOSE(LOG_TAG, "Enter");
     UpdateState(STOPPING);
 
     // deregister from audio hal
@@ -324,8 +323,8 @@ int SoundTriggerSession::StopRecognition_l()
     // stop pal stream
     status = pal_stream_stop(pal_handle_);
     if (status) {
-        ALOGE("%s: error, failed to stop pal stream, status = %d",
-              __func__, status);
+        STHAL_ERR(LOG_TAG, "error, failed to stop pal stream, status = %d",
+              status);
     }
 
     if (rec_config_payload_) {
@@ -335,7 +334,7 @@ int SoundTriggerSession::StopRecognition_l()
     rec_config_ = nullptr;
 
     UpdateState(STOPPED);
-    ALOGV("%s: Exit, status = %d", __func__, status);
+    STHAL_VERBOSE(LOG_TAG, "Exit, status = %d", status);
 
     return status;
 }
@@ -352,7 +351,7 @@ int SoundTriggerSession::LoadSoundModel(
     unsigned int size = 0;
     pal_stream_type_t stream_type = PAL_STREAM_VOICE_UI;
 
-    ALOGV("%s: Enter", __func__);
+    STHAL_VERBOSE(LOG_TAG, "Enter");
     std::lock_guard<std::mutex> lck(ses_mutex_);
 
     if (IsACDSoundModel(sound_model))
@@ -361,7 +360,7 @@ int SoundTriggerSession::LoadSoundModel(
     // open pal stream
     status = OpenPALStream(stream_type);
     if (status) {
-        ALOGE("%s: error, failed to open PAL stream", __func__);
+        STHAL_ERR(LOG_TAG, "error, failed to open PAL stream");
         goto exit;
     }
 
@@ -371,8 +370,8 @@ int SoundTriggerSession::LoadSoundModel(
         if ((stream_type != PAL_STREAM_ACD) &&
             (!common_sm->data_size ||
             (common_sm->data_offset < sizeof(*common_sm)))) {
-            ALOGE("%s: Invalid Generic sound model params "
-                  "data size=%d, data offset=%d", __func__,
+            STHAL_ERR(LOG_TAG, "Invalid Generic sound model params "
+                  "data size=%d, data offset=%d",
                   common_sm->data_size, common_sm->data_offset);
             status = -EINVAL;
             goto exit;
@@ -383,7 +382,7 @@ int SoundTriggerSession::LoadSoundModel(
         param_payload = (pal_param_payload *)calloc(1,
             sizeof(pal_param_payload) + size);
         if (!param_payload) {
-            ALOGE("%s: error, failed to allocate pal sound model", __func__);
+            STHAL_ERR(LOG_TAG, "error, failed to allocate pal sound model");
             status = -ENOMEM;
             goto exit;
         }
@@ -410,9 +409,9 @@ int SoundTriggerSession::LoadSoundModel(
             (phrase_sm->common.data_offset < sizeof(*phrase_sm)) ||
             (phrase_sm->common.type != SOUND_MODEL_TYPE_KEYPHRASE) ||
             (phrase_sm->num_phrases == 0)) {
-            ALOGE("%s: Invalid phrase sound model params "
+            STHAL_ERR(LOG_TAG, "Invalid phrase sound model params "
                   "data size=%d, data offset=%d, type=%d phrases=%d",
-                  __func__, phrase_sm->common.data_size,
+                  phrase_sm->common.data_size,
                   phrase_sm->common.data_offset, phrase_sm->common.type,
                   phrase_sm->num_phrases);
             status = -EINVAL;
@@ -424,8 +423,7 @@ int SoundTriggerSession::LoadSoundModel(
         param_payload = (pal_param_payload *)calloc(1,
             sizeof(pal_param_payload) + size);
         if (!param_payload) {
-            ALOGE("%s: error, failed to allocate pal phrase sound model",
-                __func__);
+            STHAL_ERR(LOG_TAG, "error, failed to allocate pal phrase sound model");
             status = -ENOMEM;
             goto exit;
         }
@@ -468,8 +466,8 @@ int SoundTriggerSession::LoadSoundModel(
                pal_phrase_sm->common.data_size);
         pal_common_sm = (struct pal_st_sound_model *)pal_phrase_sm;
     } else {
-        ALOGE("%s: error, unknown sound model type %d",
-              __func__, sound_model->type);
+        STHAL_ERR(LOG_TAG, "error, unknown sound model type %d",
+              sound_model->type);
         status = -EINVAL;
         goto exit;
     }
@@ -479,8 +477,8 @@ int SoundTriggerSession::LoadSoundModel(
                                   PAL_PARAM_ID_LOAD_SOUND_MODEL,
                                   param_payload);
     if (status) {
-        ALOGE("%s: error, failed to load sound model into PAL, status = %d",
-              __func__, status);
+        STHAL_ERR(LOG_TAG, "error, failed to load sound model into PAL, status = %d",
+              status);
         goto exit;
     }
 
@@ -489,7 +487,7 @@ int SoundTriggerSession::LoadSoundModel(
 exit:
     if (param_payload)
         free(param_payload);
-    ALOGV("%s: Exit, status = %d", __func__, status);
+    STHAL_VERBOSE(LOG_TAG, "Exit, status = %d", status);
 
     return status;
 }
@@ -498,20 +496,20 @@ int SoundTriggerSession::UnloadSoundModel()
 {
     int status = 0;
 
-    ALOGV("%s: Enter", __func__);
+    STHAL_VERBOSE(LOG_TAG, "Enter");
     std::lock_guard<std::mutex> lck(ses_mutex_);
     if (IsState(ACTIVE)) {
         status = StopRecognition_l();
         if (status) {
-            ALOGE("%s: error, failed to stop recognition, status = %d",
-                __func__, status);
+            STHAL_ERR(LOG_TAG, "error, failed to stop recognition, status = %d",
+                status);
         }
     }
 
     status = pal_stream_close(pal_handle_);
     if (status) {
-        ALOGE("%s: error, failed to close pal stream, status = %d",
-              __func__, status);
+        STHAL_ERR(LOG_TAG, "error, failed to close pal stream, status = %d",
+              status);
     }
     pal_handle_ = nullptr;
     if (rec_config_payload_) {
@@ -522,7 +520,7 @@ int SoundTriggerSession::UnloadSoundModel()
 
     UpdateState(IDLE);
 
-    ALOGV("%s: Exit, status = %d", __func__, status);
+    STHAL_VERBOSE(LOG_TAG, "Exit, status = %d", status);
 
     return status;
 }
@@ -536,7 +534,7 @@ int SoundTriggerSession::StartRecognition(
     int status = 0;
     unsigned int size = 0;
 
-    ALOGV("%s: Enter, state = %d", __func__, state_);
+    STHAL_VERBOSE(LOG_TAG, "Enter, state = %d", state_);
     std::lock_guard<std::mutex> lck(ses_mutex_);
 
     if (rec_config_payload_) {
@@ -548,7 +546,7 @@ int SoundTriggerSession::StartRecognition(
     rec_config_payload_ = (pal_param_payload *)calloc(1,
         sizeof(pal_param_payload) + size);
     if (!rec_config_payload_) {
-        ALOGE("%s: error, failed to allocate pal recognition config", __func__);
+        STHAL_ERR(LOG_TAG, "error, failed to allocate pal recognition config");
         status = -ENOMEM;
         goto exit;
     }
@@ -593,8 +591,8 @@ int SoundTriggerSession::StartRecognition(
                                   PAL_PARAM_ID_RECOGNITION_CONFIG,
                                   rec_config_payload_);
     if (status) {
-        ALOGE("%s: error, failed to set recognition config, status = %d",
-              __func__, status);
+        STHAL_ERR(LOG_TAG, "error, failed to set recognition config, status = %d",
+              status);
         goto exit;
     }
 
@@ -604,8 +602,8 @@ int SoundTriggerSession::StartRecognition(
     // start pal stream
     status = pal_stream_start(pal_handle_);
     if (status) {
-        ALOGE("%s: error, failed to start pal stream, status = %d",
-              __func__, status);
+        STHAL_ERR(LOG_TAG, "error, failed to start pal stream, status = %d",
+              status);
         goto exit;
     }
     UpdateState(ACTIVE);
@@ -620,7 +618,7 @@ exit:
         rec_config_ = nullptr;
     }
 
-    ALOGV("%s: Exit, status = %d", __func__, status);
+    STHAL_VERBOSE(LOG_TAG, "Exit, status = %d", status);
 
     return status;
 }
@@ -629,12 +627,12 @@ int SoundTriggerSession::StopRecognition()
 {
     int status = 0;
 
-    ALOGV("%s: Enter", __func__);
+    STHAL_VERBOSE(LOG_TAG, "Enter");
     std::lock_guard<std::mutex> lck(ses_mutex_);
 
     StopRecognition_l();
 
-    ALOGV("%s: Exit, status = %d", __func__, status);
+    STHAL_VERBOSE(LOG_TAG, "Exit, status = %d", status);
 
     return status;
 }
@@ -645,14 +643,14 @@ void SoundTriggerSession::RegisterHalEvent(bool is_register)
 
     if ((rec_config_ && rec_config_->capture_requested) && hal_callback_) {
         if (is_register) {
-            ALOGD("%s:[c%d] ST_EVENT_SESSION_REGISTER capture_handle %d",
-                  __func__, sm_handle_, rec_config_->capture_handle);
+            STHAL_DBG(LOG_TAG, "[c%d] ST_EVENT_SESSION_REGISTER capture_handle %d",
+                  sm_handle_, rec_config_->capture_handle);
             event_info.st_ses.p_ses = (void *)pal_handle_;
             event_info.st_ses.capture_handle = rec_config_->capture_handle;
             hal_callback_(ST_EVENT_SESSION_REGISTER, &event_info);
         } else {
-            ALOGD("%s:[c%d] ST_EVENT_SESSION_DEREGISTER capture_handle %d",
-                  __func__, sm_handle_, rec_config_->capture_handle);
+            STHAL_DBG(LOG_TAG, "[c%d] ST_EVENT_SESSION_DEREGISTER capture_handle %d",
+                  sm_handle_, rec_config_->capture_handle);
             event_info.st_ses.p_ses = (void *)pal_handle_;
             event_info.st_ses.capture_handle = rec_config_->capture_handle;
             hal_callback_(ST_EVENT_SESSION_DEREGISTER, &event_info);
@@ -681,18 +679,18 @@ int SoundTriggerSession::GetModuleVersion(char version[])
     pal_param_payload *param_payload = nullptr;
     struct version_arch_payload *version_payload = nullptr;
 
-    ALOGV("%s: Enter", __func__);
+    STHAL_VERBOSE(LOG_TAG, "Enter");
     std::lock_guard<std::mutex> lck(ses_mutex_);
     status = OpenPALStream(PAL_STREAM_VOICE_UI);
     if (status) {
-        ALOGE("%s: Failed to open pal stream, status = %d", __func__, status);
+        STHAL_ERR(LOG_TAG, "Failed to open pal stream, status = %d", status);
         goto exit;
     }
 
     status = pal_stream_get_param(pal_handle_,
         PAL_PARAM_ID_WAKEUP_MODULE_VERSION, &param_payload);
     if (status) {
-        ALOGE("%s: Failed to get version, status = %d", __func__, status);
+        STHAL_ERR(LOG_TAG, "Failed to get version, status = %d", status);
         goto exit;
     }
 
@@ -704,12 +702,12 @@ exit:
     if (pal_handle_) {
         status = pal_stream_close(pal_handle_);
         if (status) {
-            ALOGE("%s: error, failed to close pal stream, status = %d",
-                __func__, status);
+            STHAL_ERR(LOG_TAG, "error, failed to close pal stream, status = %d",
+                status);
         }
         pal_handle_ = nullptr;
     }
-    ALOGV("%s: Exit", __func__);
+    STHAL_VERBOSE(LOG_TAG, "Exit");
     return 0;
 }
 
