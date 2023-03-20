@@ -27,23 +27,18 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
-#define LOG_TAG "sthal_SoundTriggerDevice"
+#define LOG_TAG "STHAL: SoundTriggerDevice"
 
 #define ATRACE_TAG (ATRACE_TAG_AUDIO | ATRACE_TAG_HAL)
 
 #define LOG_NDEBUG 0
-/*#define VERY_VERY_VERBOSE_LOGGING*/
-#ifdef VERY_VERY_VERBOSE_LOGGING
-#define ALOGVV ALOGV
-#else
-#define ALOGVV(a...) do { } while (0)
-#endif
 
 #include "SoundTriggerDevice.h"
+#include "SoundTriggerCommon.h"
 
 #include <log/log.h>
 #include <cutils/atomic.h>
@@ -87,12 +82,12 @@ static int stdev_close(hw_device_t *device)
     int status = 0;
     std::shared_ptr<SoundTriggerDevice> st_device = nullptr;
 
-    ALOGD("%s: Enter", __func__);
+    STHAL_DBG(LOG_TAG, "Enter");
     ATRACE_BEGIN("sthal: stdev_close");
 
     st_device = SoundTriggerDevice::GetInstance(device);
     if (!st_device) {
-        ALOGE("%s: error, GetInstance failed", __func__);
+        STHAL_ERR(LOG_TAG, "error, GetInstance failed");
         status = -EINVAL;
         goto exit;
     }
@@ -103,7 +98,7 @@ static int stdev_close(hw_device_t *device)
 
 exit:
     ATRACE_END();
-    ALOGD("%s: Exit, status = %d", __func__, status);
+    STHAL_DBG(LOG_TAG, "Exit, status = %d",status);
 
     return status;
 }
@@ -116,31 +111,30 @@ static int stdev_get_properties(const struct sound_trigger_hw_device *dev,
     struct pal_st_properties *qstp = nullptr;
     size_t size = 0;
 
-    ALOGV("%s: Enter", __func__);
+    STHAL_VERBOSE(LOG_TAG, "Enter");
 
     if (!dev || !properties) {
-        ALOGE("%s: invalid inputs", __func__);
+        STHAL_ERR(LOG_TAG, "invalid inputs");
         return -EINVAL;
     }
 
     st_device = SoundTriggerDevice::GetInstance(dev);
     if (!st_device) {
-        ALOGE("%s: error, GetInstance failed", __func__);
+        STHAL_ERR(LOG_TAG, "error, GetInstance failed");
         return -EINVAL;
     }
 
     status =  pal_get_param(PAL_PARAM_ID_GET_SOUND_TRIGGER_PROPERTIES,
                   (void **)&qstp, &size, nullptr);
     if (status || !qstp || size < sizeof(struct pal_st_properties)) {
-        ALOGE("%s: query properties from pal failed, status %d",
-            __func__, status);
+        STHAL_ERR(LOG_TAG, "query properties from pal failed, status %d", status);
         goto exit;
     }
 
     memcpy(properties, qstp, sizeof(struct sound_trigger_properties));
 
-    ALOGVV("%s version=0x%x recognition_modes=%d, capture_transition=%d, "
-           "concurrent_capture=%d", __func__, properties->version,
+    STHAL_VERBOSE(LOG_TAG, "version=0x%x recognition_modes=%d, capture_transition=%d, "
+           "concurrent_capture=%d",properties->version,
            properties->recognition_modes, properties->capture_transition,
            properties->concurrent_capture);
     hw_properties_extended.header.version = SOUND_TRIGGER_DEVICE_API_VERSION_1_0;
@@ -149,7 +143,7 @@ exit:
     if (qstp)
         free(qstp);
 
-    ALOGV("%s: Exit, status = %d", __func__, status);
+    STHAL_VERBOSE(LOG_TAG, "Exit, status = %d", status);
     return status;
 }
 
@@ -163,12 +157,12 @@ static int stdev_load_sound_model(const struct sound_trigger_hw_device *dev,
     std::shared_ptr<SoundTriggerDevice> st_device = nullptr;
     SoundTriggerSession* st_session = nullptr;
 
-    ALOGV("%s: Enter", __func__);
+    STHAL_VERBOSE(LOG_TAG, "Enter");
     ATRACE_BEGIN("sthal: stdev_load_sound_model");
 
     st_device = SoundTriggerDevice::GetInstance(dev);
     if (!st_device) {
-        ALOGE("%s: error, GetInstance failed", __func__);
+        STHAL_ERR(LOG_TAG, "error, GetInstance failed");
         status = -EINVAL;
         goto exit;
     }
@@ -180,19 +174,18 @@ static int stdev_load_sound_model(const struct sound_trigger_hw_device *dev,
     st_session = new SoundTriggerSession(*handle, st_device->ahal_callback_);
     status = st_device->RegisterSession(st_session);
     if (status) {
-        ALOGE("%s: error, failed to register session", __func__);
+        STHAL_ERR(LOG_TAG, "error, failed to register session");
         goto exit;
     }
 
     // load sound model
     status = st_session->LoadSoundModel(sound_model);
     if (status)
-        ALOGE("%s: error, Failed to load sound model, status = %d",
-              __func__, status);
+        STHAL_ERR(LOG_TAG, "error, Failed to load sound model, status = %d", status);
 
 exit:
     ATRACE_END();
-    ALOGV("%s: Exit, status = %d", __func__, status);
+    STHAL_VERBOSE(LOG_TAG, "Exit, status = %d", status);
 
     return status;
 }
@@ -204,20 +197,19 @@ static int stdev_unload_sound_model(const struct sound_trigger_hw_device *dev,
     std::shared_ptr<SoundTriggerDevice> st_device = nullptr;
     SoundTriggerSession* st_session = nullptr;
 
-    ALOGV("%s: Enter", __func__);
+    STHAL_VERBOSE(LOG_TAG, "Enter");
     ATRACE_BEGIN("sthal: stdev_unload_sound_model");
 
     st_device = SoundTriggerDevice::GetInstance(dev);
     if (!st_device) {
-        ALOGE("%s: error, GetInstance failed", __func__);
+        STHAL_ERR(LOG_TAG, "error, GetInstance failed");
         status = -EINVAL;
         goto exit;
     }
 
     st_session = st_device->GetSession(handle);
     if (!st_session) {
-        ALOGE("%s: error, failed to get st stream by handle %d",
-              __func__, handle);
+        STHAL_ERR(LOG_TAG, "error, failed to get st stream by handle %d", handle);
         status = -EINVAL;
         goto exit;
     }
@@ -225,20 +217,19 @@ static int stdev_unload_sound_model(const struct sound_trigger_hw_device *dev,
     // deregister sound model handle
     status = st_session->UnloadSoundModel();
     if (status) {
-        ALOGE("%s: error, failed to unload sound model, status = %d",
-              __func__, status);
+        STHAL_ERR(LOG_TAG, "error, failed to unload sound model, status = %d", status);
         goto exit;
     }
 
     status = st_device->DeregisterSession(st_session);
     if (status) {
-        ALOGE("%s: error, failed to deregister session", __func__);
+        STHAL_ERR(LOG_TAG, "error, failed to deregister session");
         goto exit;
     }
 
 exit:
     ATRACE_END();
-    ALOGV("%s: Exit, status = %d", __func__, status);
+    STHAL_VERBOSE(LOG_TAG, "Exit, status = %d", status);
 
     return status;
 }
@@ -255,20 +246,20 @@ static int stdev_start_recognition
     std::shared_ptr<SoundTriggerDevice> st_device = nullptr;
     SoundTriggerSession* st_session = nullptr;
 
-    ALOGV("%s: Enter", __func__);
+    STHAL_VERBOSE(LOG_TAG, "Enter");
     ATRACE_BEGIN("sthal: stdev_start_recognition");
 
     st_device = SoundTriggerDevice::GetInstance(dev);
     if (!st_device) {
-        ALOGE("%s: error, GetInstance failed", __func__);
+        STHAL_ERR(LOG_TAG, "error, GetInstance failed");
         status = -EINVAL;
         goto exit;
     }
 
     st_session = st_device->GetSession(sound_model_handle);
     if (!st_session) {
-        ALOGE("%s: error, failed to get st stream by handle %d",
-              __func__, sound_model_handle);
+        STHAL_ERR(LOG_TAG, "error, failed to get st stream by handle %d",
+              sound_model_handle);
         status = -EINVAL;
         goto exit;
     }
@@ -276,14 +267,14 @@ static int stdev_start_recognition
     status = st_session->StartRecognition(config,
         callback, cookie, hw_properties_extended.header.version);
     if (status) {
-        ALOGE("%s: error, failed to start recognition, status = %d",
-              __func__, status);
+        STHAL_ERR(LOG_TAG, "error, failed to start recognition, status = %d",
+              status);
         goto exit;
     }
 
 exit:
     ATRACE_END();
-    ALOGV("%s: Exit, status = %d", __func__, status);
+    STHAL_VERBOSE(LOG_TAG, "Exit, status = %d", status);
 
     return status;
 }
@@ -295,20 +286,20 @@ static int stdev_stop_recognition(const struct sound_trigger_hw_device *dev,
     std::shared_ptr<SoundTriggerDevice> st_device = nullptr;
     SoundTriggerSession* st_session = nullptr;
 
-    ALOGV("%s: Enter", __func__);
+    STHAL_VERBOSE(LOG_TAG, "Enter");
     ATRACE_BEGIN("sthal: stdev_stop_recognition");
 
     st_device = SoundTriggerDevice::GetInstance(dev);
     if (!st_device) {
-        ALOGE("%s: error, GetInstance failed", __func__);
+        STHAL_ERR(LOG_TAG, "error, GetInstance failed");
         status = -EINVAL;
         goto exit;
     }
 
     st_session = st_device->GetSession(sound_model_handle);
     if (!st_session) {
-        ALOGE("%s: error, Failed to get st stream by handle %d",
-              __func__, sound_model_handle);
+        STHAL_ERR(LOG_TAG, "error, Failed to get st stream by handle %d",
+              sound_model_handle);
         status = -EINVAL;
         goto exit;
     }
@@ -316,14 +307,14 @@ static int stdev_stop_recognition(const struct sound_trigger_hw_device *dev,
     // deregister sound model handle
     status = st_session->StopRecognition();
     if (status) {
-        ALOGE("%s: error, failed to stop recognition, status = %d",
-              __func__, status);
+        STHAL_ERR(LOG_TAG, "error, failed to stop recognition, status = %d",
+              status);
         goto exit;
     }
 
 exit:
     ATRACE_END();
-    ALOGV("%s: Exit, status = %d", __func__, status);
+    STHAL_VERBOSE(LOG_TAG, "Exit, status = %d", status);
 
     return status;
 }
@@ -352,7 +343,7 @@ static int stdev_start_recognition_extended
 
 static int stdev_stop_all_recognitions(const struct sound_trigger_hw_device* dev __unused)
 {
-    ALOGV("%s: unsupported API", __func__);
+    STHAL_VERBOSE(LOG_TAG, "unsupported API");
     return -ENOSYS;
 }
 
@@ -360,7 +351,7 @@ static int stdev_get_parameter(const struct sound_trigger_hw_device *dev __unuse
     sound_model_handle_t sound_model_handle __unused,
     sound_trigger_model_parameter_t model_param __unused, int32_t* value __unused)
 {
-    ALOGV("%s: unsupported API", __func__);
+    STHAL_VERBOSE(LOG_TAG, "unsupported API");
     return -EINVAL;
 }
 
@@ -368,7 +359,7 @@ static int stdev_set_parameter(const struct sound_trigger_hw_device *dev __unuse
     sound_model_handle_t sound_model_handle __unused,
     sound_trigger_model_parameter_t model_param __unused, int32_t value __unused)
 {
-    ALOGV("%s: unsupported API", __func__);
+    STHAL_VERBOSE(LOG_TAG, "unsupported API");
     return -EINVAL;
 }
 
@@ -390,22 +381,22 @@ stdev_get_properties_extended(const struct sound_trigger_hw_device *dev)
     std::shared_ptr<SoundTriggerDevice> st_device = nullptr;
     SoundTriggerSession* st_session = nullptr;
 
-    ALOGV("%s: Enter", __func__);
+    STHAL_VERBOSE(LOG_TAG, "Enter");
     if (!dev) {
-        ALOGW("%s: invalid sound_trigger_hw_device received", __func__);
+        STHAL_WARN(LOG_TAG, "invalid sound_trigger_hw_device received");
         return nullptr;
     }
 
     st_device = SoundTriggerDevice::GetInstance(dev);
     if (!st_device) {
-        ALOGE("%s: error, GetInstance failed", __func__);
+        STHAL_ERR(LOG_TAG, "error, GetInstance failed");
         return nullptr;
     }
 
     prop_hdr = (struct sound_trigger_properties_header *)&hw_properties_extended;
     status = stdev_get_properties(dev, &hw_properties_extended.base);
     if (status) {
-        ALOGW("%s: Failed to initialize the stdev properties", __func__);
+        STHAL_WARN(LOG_TAG, "Failed to initialize the stdev properties");
         return nullptr;
     }
     hw_properties_extended.header.size = sizeof(struct sound_trigger_properties_extended_1_3);
@@ -417,7 +408,7 @@ stdev_get_properties_extended(const struct sound_trigger_hw_device *dev)
     status = st_session->GetModuleVersion(hw_properties_extended.supported_model_arch);
     delete st_session;
     if (status) {
-        ALOGE("%s: Failed to get module version, status = %d", __func__, status);
+        STHAL_ERR(LOG_TAG, "Failed to get module version, status = %d", status);
     }
 
     return prop_hdr;
@@ -457,34 +448,34 @@ int SoundTriggerDevice::Init(hw_device_t **device, const hw_module_t *module)
 {
     int status = 0;
 
-    ALOGD("%s: Enter", __func__);
+    STHAL_DBG(LOG_TAG, "Enter");
 
     if (stdev_ref_cnt != 0) {
         *device = &device_->common;
         stdev_ref_cnt++;
-        ALOGD("%s: returning existing stdev instance, exit", __func__);
+        STHAL_DBG(LOG_TAG, "returning existing stdev instance, exit");
         return status;
     }
 
 #ifdef LSM_HIDL_ENABLED
     /* Register LSM Lib HIDL service */
-    ALOGD("%s: Register LSM HIDL service", __func__);
+    STHAL_DBG(LOG_TAG, "Register LSM HIDL service");
     sp<IListenSoundModel> service = new ListenSoundModel();
     if(android::OK !=  service->registerAsService())
-        ALOGW("Could not register LSM HIDL service");
+        STHAL_WARN(LOG_TAG, "Could not register LSM HIDL service");
 #endif
 
     // load audio hal
     status = LoadAudioHal();
     if (status) {
-        ALOGE("%s: failed to load audio hal, status = %d", __func__, status);
+        STHAL_ERR(LOG_TAG, "failed to load audio hal, status = %d", status);
         goto exit;
     }
 
     // platform init
     status = PlatformInit();
     if (status) {
-        ALOGE("%s: failed to do platform init, status = %d", __func__, status);
+        STHAL_ERR(LOG_TAG, "failed to do platform init, status = %d", status);
         goto exit;
     }
 
@@ -520,7 +511,7 @@ int SoundTriggerDevice::Init(hw_device_t **device, const hw_module_t *module)
     stdev_ref_cnt++;
 
 exit:
-    ALOGV("%s: Exit, status = %d", __func__, status);
+    STHAL_VERBOSE(LOG_TAG, "Exit, status = %d", status);
 
     return status;
 }
@@ -532,7 +523,7 @@ int SoundTriggerDevice::LoadAudioHal()
     void *apiVersion = nullptr;
     audio_extn_hidl_init initAudioExtn = nullptr;
 
-    ALOGD("%s: Enter", __func__);
+    STHAL_DBG(LOG_TAG, "Enter");
 
     snprintf(audio_hal_lib, sizeof(audio_hal_lib), "%s/%s.%s.so",
              AUDIO_HAL_LIBRARY_PATH1, AUDIO_HAL_NAME_PREFIX,
@@ -542,7 +533,7 @@ int SoundTriggerDevice::LoadAudioHal()
                  AUDIO_HAL_LIBRARY_PATH2, AUDIO_HAL_NAME_PREFIX,
                  XSTR(SOUND_TRIGGER_PLATFORM));
         if (access(audio_hal_lib, R_OK)) {
-            ALOGE("%s: ERROR. %s not found", __func__, audio_hal_lib);
+            STHAL_ERR(LOG_TAG, "ERROR. %s not found", audio_hal_lib);
             status = -ENOENT;
             goto error;
         }
@@ -550,7 +541,7 @@ int SoundTriggerDevice::LoadAudioHal()
 
     ahal_handle_ = dlopen(audio_hal_lib, RTLD_NOW);
     if (!ahal_handle_) {
-        ALOGE("%s: ERROR. %s", __func__, dlerror());
+        STHAL_ERR(LOG_TAG, "ERROR. %s", dlerror());
         status = -ENODEV;
         goto error;
     }
@@ -558,8 +549,7 @@ int SoundTriggerDevice::LoadAudioHal()
     ahal_callback_ = (audio_hw_call_back_t)dlsym(ahal_handle_,
                                                  "audio_hw_call_back");
     if (!ahal_callback_) {
-        ALOGE("%s: error, failed to get symbol for audio_hw_call_back",
-              __func__);
+        STHAL_ERR(LOG_TAG, "error, failed to get symbol for audio_hw_call_back");
         status = -ENODEV;
         goto error;
     }
@@ -571,19 +561,18 @@ int SoundTriggerDevice::LoadAudioHal()
         sthal_prop_api_version_ = *(int*)apiVersion;
         if (MAJOR_VERSION(sthal_prop_api_version_) !=
             MAJOR_VERSION(sthal_prop_api_version)) {
-            ALOGE("%s: Incompatible API versions sthal:0x%x != ahal:0x%x",
-                  __func__, STHAL_PROP_API_CURRENT_VERSION,
+            STHAL_ERR(LOG_TAG, "Incompatible API versions sthal:0x%x != ahal:0x%x",
+                  STHAL_PROP_API_CURRENT_VERSION,
                   sthal_prop_api_version_);
             goto error;
         }
-        ALOGD("%s: ahal is using API version 0x%04x", __func__,
+        STHAL_DBG(LOG_TAG, "ahal is using API version 0x%04x",
               sthal_prop_api_version_);
     }
 
     initAudioExtn = (audio_extn_hidl_init)dlsym(ahal_handle_, "check_init_audio_extension");
     if (!initAudioExtn) {
-        ALOGW("%s: error, failed to get symbol for initAudioExtn",
-              __func__);
+        STHAL_WARN(LOG_TAG, "error, failed to get symbol for initAudioExtn");
     } else {
         initAudioExtn();
     }
@@ -594,7 +583,7 @@ error:
         dlclose(ahal_handle_);
         ahal_handle_ = nullptr;
     }
-    ALOGV("%s: Exit, status = %d", __func__, status);
+    STHAL_VERBOSE(LOG_TAG, "Exit, status = %d", status);
 
     return status;
 }
@@ -646,7 +635,7 @@ int SoundTriggerDevice::DeregisterSession(SoundTriggerSession* session)
         session_list_.erase(iter);
     } else {
         status = -ENOENT;
-        ALOGE("%s: session found in session list", __func__);
+        STHAL_ERR(LOG_TAG, "session found in session list");
     }
     mutex_.unlock();
 
@@ -659,29 +648,29 @@ static int stdev_open(const hw_module_t* module, const char* name,
     int status = 0;
     std::shared_ptr<SoundTriggerDevice> st_device = nullptr;
 
-    ALOGD("%s: Enter", __func__);
+    STHAL_DBG(LOG_TAG, "Enter");
     ATRACE_BEGIN("sthal: stdev_open");
 
     if (strcmp(name, SOUND_TRIGGER_HARDWARE_INTERFACE) != 0) {
-        ALOGE("%s: ERROR. wrong interface", __func__);
+        STHAL_ERR(LOG_TAG, "ERROR. wrong interface");
         status = -EINVAL;
         goto exit;
     }
 
     st_device = SoundTriggerDevice::GetInstance();
     if (!st_device) {
-        ALOGE("%s: error, GetInstance failed", __func__);
+        STHAL_ERR(LOG_TAG, "error, GetInstance failed");
         goto exit;
     }
 
     status = st_device->Init(device, module);
     if (status || (*device == nullptr))
-        ALOGE("%s: error, audio device init failed, ret(%d), *device(%p)",
-              __func__, status, *device);
+        STHAL_ERR(LOG_TAG, "error, audio device init failed, ret(%d), *device(%p)",
+              status, *device);
 
 exit:
     ATRACE_END();
-    ALOGV("%s: Exit, status = %d", __func__, status);
+    STHAL_VERBOSE(LOG_TAG, "Exit, status = %d", status);
 
     return status;
 }
