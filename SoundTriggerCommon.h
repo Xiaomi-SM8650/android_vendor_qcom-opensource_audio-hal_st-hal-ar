@@ -17,23 +17,23 @@
 static uint32_t sthal_log_lvl = STHAL_LOG_ERR|STHAL_LOG_WARN|STHAL_LOG_INFO|STHAL_LOG_DBG;
 
 
-#define STHAL_ERR(arg,...)                                          \
+#define STHAL_ERR(log_tag, arg,...)                                          \
     if (sthal_log_lvl & STHAL_LOG_ERR) {                              \
         ALOGE("%s: %d: "  arg, __func__, __LINE__, ##__VA_ARGS__);\
     }
-#define STHAL_WARN(arg,...)                                          \
+#define STHAL_WARN(log_tag, arg,...)                                          \
     if (sthal_log_lvl & STHAL_LOG_WARN) {                              \
         ALOGW("%s: %d: "  arg, __func__, __LINE__, ##__VA_ARGS__);\
     }
-#define STHAL_DBG(arg,...)                                           \
+#define STHAL_DBG(log_tag, arg,...)                                           \
     if (sthal_log_lvl & STHAL_LOG_DBG) {                               \
         ALOGD("%s: %d: "  arg, __func__, __LINE__, ##__VA_ARGS__); \
     }
-#define STHAL_INFO(arg,...)                                         \
+#define STHAL_INFO(log_tag, arg,...)                                         \
     if (sthal_log_lvl & STHAL_LOG_INFO) {                             \
         ALOGI("%s: %d: "  arg, __func__, __LINE__, ##__VA_ARGS__);\
     }
-#define STHAL_VERBOSE(arg,...)                                      \
+#define STHAL_VERBOSE(log_tag, arg,...)                                      \
     if (sthal_log_lvl & STHAL_LOG_VERBOSE) {                          \
         ALOGV("%s: %d: "  arg, __func__, __LINE__, ##__VA_ARGS__);\
     }
