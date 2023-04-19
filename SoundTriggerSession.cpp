@@ -286,7 +286,6 @@ int SoundTriggerSession::OpenPALStream(pal_stream_type_t stream_type)
     stream_attributes.in_media_config.ch_info.channels = 1;
     stream_attributes.in_media_config.ch_info.ch_map[0] = PAL_CHMAP_CHANNEL_FL;
 
-    STHAL_DBG(LOG_TAG, "(%x:status)%d", status, __LINE__);
     status = pal_stream_open(&stream_attributes,
                              1,
                              &device,
@@ -296,7 +295,7 @@ int SoundTriggerSession::OpenPALStream(pal_stream_type_t stream_type)
                              (uint64_t)this,
                              &pal_handle_);
 
-    STHAL_DBG(LOG_TAG, "(%x:status)%d", status, __LINE__);
+    STHAL_DBG(LOG_TAG, "(%x:status)", status);
 
     if (status) {
         STHAL_ERR(LOG_TAG, "Pal Stream Open Error (%x)", status);
