@@ -574,7 +574,11 @@ int SoundTriggerDevice::LoadAudioHal()
     if (!initAudioExtn) {
         STHAL_WARN(LOG_TAG, "error, failed to get symbol for initAudioExtn");
     } else {
-        initAudioExtn();
+        status = initAudioExtn();
+        if (status) {
+            ALOGE("%s: error, failed to init audio extn", __func__);
+            goto error;
+        }
     }
     return status;
 
